@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 import torch
 
-from mmsafety.models import pick_device
+from lever.models import pick_device
 
 
 @dataclass

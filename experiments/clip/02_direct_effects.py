@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import torch
 from PIL import Image
 
-from mmsafety import decompose_image_embedding, label_probs, load_clip
+from lever import decompose_image_embedding, label_probs, load_clip
 
 
 def main():

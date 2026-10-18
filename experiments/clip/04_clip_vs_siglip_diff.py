@@ -10,7 +10,12 @@ Four questions, one section each:
   B. Geometry: how far apart are image and text embeddings (modality gap)? How spread out?
   C. Layers: where do the two encoders' representations agree (CKA), and where does class
      information become linearly decodable (probes)? For CLIP, CLS vs patch-mean.
-  D. Text reading: how strongly does written text in the image drive each model's output?
+  D. Text reading: how strongly does written text in the image drive each model's output? Swept
+     over stamp size, with text-only images at each size, so "can it read" and "does it follow"
+     are measured at the same text size.
+
+Section letters here are the summary.json keys. In the blog post, A/B/D appear as A1-A3 ("as
+models in their own right") and C as B2-B3 ("as VLM backbones").
 
 Data: Imagenette (10 easy ImageNet classes), val split, `--per-class` images each.
 
@@ -31,15 +36,30 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from torchvision.datasets import Imagenette
 
-from mmsafety.dual_encoders import load_dual_encoder
-from mmsafety.images import stamp_text
-from mmsafety.similarity import linear_cka
+from lever.dual_encoders import load_dual_encoder
+from lever.images import stamp_text
+from lever.similarity import linear_cka
 
 TEMPLATES = ["a photo of a {}.", "a blurry photo of a {}.", "a close-up photo of a {}.", "a photo of the {}.", "an image of a {}."]
 
 
+def center_square(im: Image.Image) -> Image.Image:
+    """Center-crop to a square before anything else touches the image.
+
+    Why: the two processors handle non-square inputs differently. CLIP resizes the short side and
+    center-crops; SigLIP squashes the whole image to 224x224. Most Imagenette images are 213x160,
+    so without this CLIP would see a cropped view (clipping the sides of long stamped labels) and
+    SigLIP a horizontally squashed one: different stimuli, confounding the attack comparison.
+    On a square image both reduce to the same bicubic resize, so both models see the same content.
+    """
+    s = min(im.size)
+    left, top = (im.width - s) // 2, (im.height - s) // 2
+    return im.crop((left, top, left + s, top + s))
+
+
 def load_images(per_class: int, seed: int):
-    """Balanced subset so per-class numbers and probes aren't skewed by class frequency."""
+    """Balanced subset so per-class numbers and probes aren't skewed by class frequency.
+    Square-cropped (see center_square) so preprocessing can't differ between models."""
     ds = Imagenette("data", split="val", size="160px", download=not Path("data/imagenette2-160").exists())
     classes = [names[0] for names in ds.classes]
     by_class: dict[int, list[int]] = {}
@@ -47,7 +67,7 @@ def load_images(per_class: int, seed: int):
         by_class.setdefault(y, []).append(i)
     rng = random.Random(seed)
     idx = [i for y in sorted(by_class) for i in rng.sample(by_class[y], per_class)]
-    images = [ds[i][0].convert("RGB") for i in idx]
+    images = [center_square(ds[i][0].convert("RGB")) for i in idx]
     labels = torch.tensor([ds[i][1] for i in idx])
     return images, labels, classes
 
@@ -83,6 +103,19 @@ def modality_gap(img: torch.Tensor, txt: torch.Tensor, labels: torch.Tensor) -> 
     }
 
 
+def bootstrap_ci(stat, n: int, n_boot: int = 2000, seed: int = 0) -> list[float]:
+    """95% percentile-bootstrap CI over images for stat(idx) -> float.
+
+    Why: 500 images and one seed; the post compares rates like 57% vs 31%, and readers need to
+    know whether a gap is outside resampling noise. Resampling the *same* indices for both models
+    gives a paired CI on differences, which is much tighter than comparing two independent CIs.
+    Covers image sampling only, not the choice of classes, stamp style or seed.
+    """
+    g = torch.Generator().manual_seed(seed)
+    vals = torch.tensor([stat(torch.randint(0, n, (n,), generator=g)) for _ in range(n_boot)])
+    return [round(float(v), 3) for v in vals.quantile(torch.tensor([0.025, 0.975], dtype=vals.dtype))]
+
+
 def zscore(x: torch.Tensor) -> torch.Tensor:
     """Per-dimension standardization. Needed because raw CKA is dominated by the highest-variance
     dimensions: CLIP develops a single outlier dim at layer 8 holding ~half the variance, which
@@ -101,6 +134,16 @@ def main():
     p.add_argument("--models", nargs=2, default=["openai/clip-vit-base-patch16", "google/siglip-base-patch16-224"])
     p.add_argument("--per-class", type=int, default=50)
     p.add_argument("--seed", type=int, default=0)
+    # Text height as a fraction of image height. The headline numbers use --stamp-size; the sweep
+    # shows whether the CLIP/SigLIP gap is a property of the models or of one chosen size.
+    # Sweep floor is 0.08: stamp_text clamps fonts to >=12px, so smaller sizes on 160px images would
+    # be mislabeled on the x-axis.
+    p.add_argument("--stamp-size", type=float, default=0.15)
+    p.add_argument("--stamp-sweep", type=float, nargs="+", default=[0.08, 0.1, 0.12, 0.15, 0.2])
+    # The single illustrative image for the write-up. Index is into the loaded subset, so it only
+    # points at the same photo for the default --per-class/--seed. 25 = tench pile, no people in frame.
+    p.add_argument("--example-idx", type=int, default=25)
+    p.add_argument("--example-text", default="gas pump")
     p.add_argument("--out", default="outputs/clip_04_clip_vs_siglip")
     args = p.parse_args()
     out = Path(args.out)
@@ -113,25 +156,40 @@ def main():
     # Typographic stimuli (section D), built once so both models see identical pixels.
     rng = random.Random(args.seed)
     stamped_cls = torch.tensor([(int(y) + rng.randint(1, n_cls - 1)) % n_cls for y in labels])  # always a wrong class
-    attacked = [stamp_text(im, classes[c], 0.15) for im, c in zip(images, stamped_cls.tolist())]
-    # Pure text on flat backgrounds: isolates reading from any object evidence.
-    text_only = [stamp_text(Image.new("RGB", (224, 224), (g, g, g)), c, 0.12) for c in classes for g in (60, 120, 180, 230)]
+    sizes = sorted(set(args.stamp_sweep) | {args.stamp_size})
+    attacked = {s: [stamp_text(im, classes[c], s) for im, c in zip(images, stamped_cls.tolist())] for s in sizes}
+    # Pure text on flat backgrounds, same canvas size as the photos so a given `s` gives the same
+    # text height in model input: isolates reading from any object evidence, at matched size.
+    side = images[0].height
+    text_only = {s: [stamp_text(Image.new("RGB", (side, side), (g, g, g)), c, s) for c in classes for g in (60, 120, 180, 230)]
+                 for s in sizes}
     text_only_labels = torch.tensor([i for i in range(n_cls) for _ in range(4)])
-    attacked[0].save(out / "example_attacked.png")
+    # Fixed-text example, separate from the random-wrong-class attack set: a write-up needs one
+    # concrete, checkable case, and recording both models' predictions on it keeps the prose honest.
+    example = stamp_text(images[args.example_idx], args.example_text, args.stamp_size)
+    example.save(out / "example_attacked.png")
 
     feats, summary = {}, {}
     for model_id in args.models:
         enc = load_dual_encoder(model_id)
         txt = class_text_embeds(enc, classes)
         f = enc.encode_images(images)
-        f_att = enc.encode_images(attacked).embeds
-        f_txt = enc.encode_images(text_only).embeds
         feats[enc.name] = f
 
         scores = enc.label_scores(f.embeds, txt)
         pred = scores.argmax(-1)
-        pred_att = enc.label_scores(f_att, txt).argmax(-1)
-        pred_txt = enc.label_scores(f_txt, txt).argmax(-1)
+        sweep = {}
+        for s in sizes:
+            pred_att = enc.label_scores(enc.encode_images(attacked[s]).embeds, txt).argmax(-1)
+            pred_txt = enc.label_scores(enc.encode_images(text_only[s]).embeds, txt).argmax(-1)
+            sweep[s] = {
+                "attack_acc": float((pred_att == labels).float().mean()),
+                "attack_success": float((pred_att == stamped_cls).float().mean()),  # followed the text
+                "text_only_acc": float((pred_txt == text_only_labels).float().mean()),
+                "_followed": pred_att == stamped_cls,
+            }
+        head = sweep[args.stamp_size]
+        ex = enc.label_scores(enc.encode_images([images[args.example_idx], example]).embeds, txt)
 
         geo = modality_gap(f.embeds, txt, labels)
         summary[enc.name] = {
@@ -142,10 +200,17 @@ def main():
             "A_mean_top_score": float(scores.max(-1).values.mean()),
             "A_frac_top_score_below_0.5": float((scores.max(-1).values < 0.5).float().mean()),
             "B_geometry": geo,
-            "D_attack_acc": float((pred_att == labels).float().mean()),
-            "D_attack_success": float((pred_att == stamped_cls).float().mean()),  # followed the text
-            "D_text_only_acc": float((pred_txt == text_only_labels).float().mean()),
+            "D_stamp_size": args.stamp_size,
+            "D_attack_acc": head["attack_acc"],
+            "D_attack_success": head["attack_success"],
+            "D_attack_success_ci95": bootstrap_ci(lambda i, v=head["_followed"]: v[i].float().mean(), len(labels)),
+            "D_text_only_acc": head["text_only_acc"],
+            "D_example": {
+                f"{k}_pred": classes[int(v.argmax())] for k, v in zip(("clean", "stamped"), ex)
+            } | {f"{k}_top_score": round(float(v.max()), 3) for k, v in zip(("clean", "stamped"), ex)},
+            "D_sweep": {s: {k: v for k, v in d.items() if not k.startswith("_")} for s, d in sweep.items()},
             "_pred": pred,
+            "_followed": head["_followed"],
         }
         del enc  # free the first model before loading the second; both at once is tight on 16 GB
         if torch.backends.mps.is_available():
@@ -153,6 +218,12 @@ def main():
 
     a, b = list(summary)
     pa, pb = summary[a].pop("_pred"), summary[b].pop("_pred")
+    fol_a, fol_b = summary[a].pop("_followed"), summary[b].pop("_followed")
+    # Paired: same images, same stamps, so resample indices jointly (see bootstrap_ci).
+    summary["D_attack_success_diff"] = {
+        "a_minus_b": float(fol_a.float().mean() - fol_b.float().mean()),
+        "ci95": bootstrap_ci(lambda i: fol_a[i].float().mean() - fol_b[i].float().mean(), len(labels)),
+    }
     summary["A_agreement"] = {
         "same_prediction": float((pa == pb).float().mean()),
         f"only_{a}_right": float(((pa == labels) & (pb != labels)).float().mean()),
@@ -180,9 +251,9 @@ def main():
     # C2. Linear probes per layer. For CLIP, CLS vs patch-mean: LLaVA consumes patches, not CLS.
     probes = {}
     for name, f in feats.items():
-        probes[f"{name} patch-mean"] = [probe_accuracy(f.patch_means[l], labels) for l in range(len(f.patch_means))]
+        probes[f"{name} patch-mean"] = [probe_accuracy(x, labels) for x in f.patch_means]
         if f.cls is not None:
-            probes[f"{name} CLS"] = [probe_accuracy(f.cls[l], labels) for l in range(len(f.cls))]
+            probes[f"{name} CLS"] = [probe_accuracy(x, labels) for x in f.cls]
     summary["C_probe_acc_by_layer"] = {k: [round(v, 3) for v in vs] for k, vs in probes.items()}
 
     fig, ax = plt.subplots(figsize=(7, 4))
@@ -195,6 +266,23 @@ def main():
     fig.tight_layout()
     fig.savefig(out / "probes.png", dpi=130)
 
+    # D. Dose-response: following (solid) vs reading (dashed) at each text size. If both models read
+    # perfectly at a size where they follow at different rates, the gap is in weighting, not reading.
+    fig, ax = plt.subplots(figsize=(7, 4))
+    for k in (a, b):
+        sw = summary[k]["D_sweep"]
+        xs = sorted(sw)
+        line, = ax.plot(xs, [sw[x]["attack_success"] for x in xs], marker="o", label=f"{k}: follows stamped text")
+        ax.plot(xs, [sw[x]["text_only_acc"] for x in xs], marker="s", ls="--", color=line.get_color(),
+                label=f"{k}: reads text-only image")
+    ax.axvline(args.stamp_size, color="gray", ls=":", lw=1)
+    ax.set_xlabel("text height (fraction of image height)")
+    ax.set_ylabel("rate")
+    ax.set_ylim(0, 1.02)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    fig.savefig(out / "attack_sweep.png", dpi=130)
+
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
     for k in (a, b):
         s = summary[k]
@@ -205,8 +293,12 @@ def main():
         print(f"  B modality gap {g['gap']:.3f} | cos(img, own class text) {g['mean_cos_matched']:.3f} "
               f"| anisotropy img {g['image_anisotropy']:.3f} txt {g['text_anisotropy']:.3f}")
         print(f"  D attacked acc {s['D_attack_acc']:.3f} | followed stamped text {s['D_attack_success']:.3f} "
-              f"| text-only acc {s['D_text_only_acc']:.3f}")
+              f"{s['D_attack_success_ci95']} | text-only acc {s['D_text_only_acc']:.3f}")
+        print(f"  D example ({args.example_text!r} on image {args.example_idx}): {s['D_example']}")
+        for sz, d in s["D_sweep"].items():
+            print(f"    size {sz:.2f}: follows {d['attack_success']:.3f} | reads text-only {d['text_only_acc']:.3f}")
     print(f"\nagreement: {summary['A_agreement']}")
+    print(f"attack success {a} - {b}: {summary['D_attack_success_diff']}")
     print(f"CKA diagonal raw:          {summary['C_cka_diagonal_raw']}")
     print(f"CKA diagonal standardized: {summary['C_cka_diagonal_standardized']}")
     print(f"CKA final embeds: {summary['C_cka_final_embeds']:.3f}")

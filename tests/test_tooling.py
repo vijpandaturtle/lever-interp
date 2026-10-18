@@ -1,6 +1,6 @@
 import torch
 
-from mmsafety import logit_lens, patch_output, record
+from lever import logit_lens, patch_output, record
 
 
 def test_hook_points_resolve(tiny):

@@ -1,6 +1,6 @@
 import torch
 
-from mmsafety.similarity import linear_cka
+from lever.similarity import linear_cka
 
 
 def test_cka_invariances():

@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import torch
 from PIL import Image
 
-from mmsafety import load_vlm, logit_lens, record, top_tokens
+from lever import load_vlm, logit_lens, record, top_tokens
 
 
 def concept_token_ids(vlm, word: str) -> int:

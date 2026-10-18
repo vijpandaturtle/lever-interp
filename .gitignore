@@ -221,3 +221,6 @@ __marimo__/
 outputs/
 data/
 *.safetensors
+
+# mkdocs build output
+site/

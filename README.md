@@ -1,4 +1,4 @@
-# multimodal-ai-safety
+# lever
 
 Mechanistic interpretability and safety research on vision-language models, building up in stages:
 
@@ -9,10 +9,12 @@ simplest possible bridge (CLIP/SigLIP ViT + MLP projector + LM), Qwen-VL adds na
 patches, 2×2 token merging, M-RoPE (and DeepStack in Qwen3-VL), and the driving model adds a task
 where mistakes are safety-critical. Insights and tools carry forward from one stage to the next.
 
+**Library docs:** [docs/index.md](docs/index.md)
+
 ## Layout
 
 ```
-src/mmsafety/
+src/lever/
   clip.py        CLIP wrapper: residual lens into joint space, exact per-head/MLP decomposition
   dual_encoders.py  CLIP + SigLIP behind one interface (for cross-encoder comparisons)
   similarity.py  linear CKA (model diffing)
