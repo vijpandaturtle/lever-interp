@@ -1,0 +1,34 @@
+site_name: mmsafety
+site_description: Mechanistic interpretability tooling for vision-language models, built for safety research
+repo_url: https://github.com/vijpandaturtle/multimodal-ai-safety
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.top
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: {icon: material/brightness-7, name: Switch to dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle: {icon: material/brightness-4, name: Switch to light mode}
+
+nav:
+  - Home: index.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+# Fail the build on broken links/anchors instead of publishing them.
+validation:
+  links:
+    anchors: warn
