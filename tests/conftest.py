@@ -13,7 +13,7 @@ from transformers import (
     Qwen3VLForConditionalGeneration,
 )
 
-from mmsafety import CLIP, wrap_model
+from lever import CLIP, wrap_model
 
 TEXT = dict(hidden_size=64, intermediate_size=128, num_hidden_layers=3, num_attention_heads=4, num_key_value_heads=2)
 TINY_VIT = dict(hidden_size=32, intermediate_size=64, num_hidden_layers=2, num_attention_heads=2, image_size=32, patch_size=8)

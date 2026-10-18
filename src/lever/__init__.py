@@ -1,9 +1,9 @@
 """Interpretability tooling for CLIP, LLaVA, and Qwen-VL-family models."""
 
-from mmsafety.clip import CLIP, decompose_image_embedding, label_probs, load_clip
-from mmsafety.hooks import patch_output, record
-from mmsafety.lens import logit_lens, top_tokens
-from mmsafety.models import VLM, load_vlm, wrap_model
+from lever.clip import CLIP, decompose_image_embedding, label_probs, load_clip
+from lever.hooks import patch_output, record
+from lever.lens import logit_lens, top_tokens
+from lever.models import VLM, load_vlm, wrap_model
 
 __all__ = [
     "CLIP", "load_clip", "decompose_image_embedding", "label_probs",

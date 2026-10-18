@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import torch
 
-from mmsafety.models import VLM
+from lever.models import VLM
 
 
 @torch.no_grad()

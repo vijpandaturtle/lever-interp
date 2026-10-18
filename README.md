@@ -1,4 +1,4 @@
-# multimodal-ai-safety
+# lever
 
 Mechanistic interpretability and safety research on vision-language models, building up in stages:
 
@@ -14,7 +14,7 @@ where mistakes are safety-critical. Insights and tools carry forward from one st
 ## Layout
 
 ```
-src/mmsafety/
+src/lever/
   clip.py        CLIP wrapper: residual lens into joint space, exact per-head/MLP decomposition
   dual_encoders.py  CLIP + SigLIP behind one interface (for cross-encoder comparisons)
   similarity.py  linear CKA (model diffing)

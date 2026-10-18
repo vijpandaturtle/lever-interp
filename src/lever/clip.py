@@ -19,8 +19,8 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 
-from mmsafety.hooks import record
-from mmsafety.models import pick_device
+from lever.hooks import record
+from lever.models import pick_device
 
 
 @dataclass

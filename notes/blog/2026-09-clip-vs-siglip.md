@@ -276,7 +276,7 @@ the experiment I'm most keen to run next.
 ## Reproduce it
 
 Code, tests and the research log are in the
-[multimodal-ai-safety](https://github.com/vijpandaturtle/multimodal-ai-safety) repo:
+[lever-interp](https://github.com/vijpandaturtle/lever-interp) repo:
 
 ```bash
 uv sync

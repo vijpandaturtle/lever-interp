@@ -1,6 +1,6 @@
 import torch
 
-from mmsafety import decompose_image_embedding, record
+from lever import decompose_image_embedding, record
 
 
 def test_decomposition_sums_to_image_embedding(tiny_clip):

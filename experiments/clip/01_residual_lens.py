@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import torch
 from PIL import Image
 
-from mmsafety import label_probs, load_clip, record
+from lever import label_probs, load_clip, record
 
 
 def main():

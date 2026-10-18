@@ -1,8 +1,8 @@
-# mmsafety
+# lever
 
 Mechanistic interpretability tooling for vision-language models, built for safety research.
 
-`mmsafety` gives you one way to observe and intervene on the internals of CLIP, SigLIP, LLaVA and
+`lever` gives you one way to observe and intervene on the internals of CLIP, SigLIP, LLaVA and
 Qwen-VL models, so that **the same experiment runs unchanged as you move from a vision encoder to
 the VLMs built on it**. It's the code behind the research in this repo, which works in stages:
 CLIP → LLaVA → Qwen-VL → Qwen-based driving models.
@@ -39,7 +39,7 @@ models, the tools "cover narrow fields," and there's no unified way to evaluate 
 3. **Safety questions need attacks and interpretability in the same place.** "Why does this model
    follow text written in the image?" means generating the attack *and* tracing it through the model.
 
-`mmsafety` addresses these with architecture-neutral hook names, thin wrappers that never replace the
+`lever` addresses these with architecture-neutral hook names, thin wrappers that never replace the
 model's own forward pass, and attack stimuli that live next to the analysis tools.
 
 ## Install
@@ -47,8 +47,8 @@ model's own forward pass, and attack stimuli that live next to the analysis tool
 Requires Python 3.11–3.12. The project uses [uv](https://docs.astral.sh/uv/):
 
 ```bash
-git clone https://github.com/vijpandaturtle/multimodal-ai-safety.git
-cd multimodal-ai-safety
+git clone https://github.com/vijpandaturtle/lever-interp.git
+cd lever-interp
 uv sync
 ```
 
@@ -118,7 +118,7 @@ can come from a wrapper bug.
 ```python
 import torch
 from PIL import Image
-from mmsafety import load_vlm, record, patch_output, logit_lens, top_tokens
+from lever import load_vlm, record, patch_output, logit_lens, top_tokens
 
 vlm = load_vlm("llava-hf/llava-interleave-qwen-0.5b-hf")       # or "Qwen/Qwen2.5-VL-3B-Instruct"
 inputs = vlm.prepare(Image.open("scene.jpg"), "Is it safe to turn left?")
@@ -140,7 +140,7 @@ with torch.no_grad(), patch_output(vlm.projector, torch.zeros_like):
 ### Decompose a CLIP prediction into heads
 
 ```python
-from mmsafety import load_clip, decompose_image_embedding
+from lever import load_clip, decompose_image_embedding
 
 clip = load_clip("openai/clip-vit-base-patch16")
 pv = clip.pixels(Image.open("apple_with_ipod_note.jpg"))
@@ -156,8 +156,8 @@ for i in contrib.argsort(descending=True)[:5]:
 ### Compare CLIP and SigLIP
 
 ```python
-from mmsafety.dual_encoders import load_dual_encoder
-from mmsafety.similarity import linear_cka
+from lever.dual_encoders import load_dual_encoder
+from lever.similarity import linear_cka
 
 clip = load_dual_encoder("openai/clip-vit-base-patch16")
 siglip = load_dual_encoder("google/siglip-base-patch16-224")
@@ -167,7 +167,7 @@ print(linear_cka(fa.patch_means[10], fb.patch_means[10]))            # layer-10 
 
 ## API reference
 
-### `mmsafety.models`: VLMs
+### `lever.models`: VLMs
 
 **`load_vlm(model_id="llava-hf/llava-interleave-qwen-0.5b-hf", device=None, dtype=torch.bfloat16, max_pixels=512*28*28) -> VLM`**
 Loads a LLaVA or Qwen-VL checkpoint, including driving fine-tunes built on them. `max_pixels` (Qwen
@@ -194,7 +194,7 @@ anything else rather than guessing module paths.
 
 **`pick_device()`**: CUDA, then MPS, then CPU.
 
-### `mmsafety.hooks`
+### `lever.hooks`
 
 **`record(points: Mapping[str, nn.Module], to_cpu=False)`**: a context manager that yields a
 `dict[str, Tensor]` of each module's primary output (the first element if it returns a tuple).
@@ -214,7 +214,7 @@ lambda x: x + alpha * direction       # steering
 Everything downstream recomputes, so this measures **total** effect. Contrast with
 `decompose_image_embedding`, which measures **direct** effect only.
 
-### `mmsafety.lens`
+### `lever.lens`
 
 **`logit_lens(vlm, resid) -> log-probs [..., vocab]`**: applies the model's final norm and `lm_head`.
 It accepts cached CPU/fp32 tensors and casts them to the head's device and dtype. At the last layer
@@ -222,7 +222,7 @@ it reproduces the model's own logits exactly (tested).
 
 **`top_tokens(vlm, logprobs, k=5) -> [[(token, prob), ...], ...]`**: human-readable top-k per row.
 
-### `mmsafety.clip`: CLIP internals
+### `lever.clip`: CLIP internals
 
 **`load_clip(model_id="openai/clip-vit-base-patch32", device=None, dtype=torch.float32) -> CLIP`**
 The default is fp32, because the decomposition sums hundreds of terms and its exactness degrades in
@@ -249,7 +249,7 @@ label's logit is `component @ text_embedding`.
 **`label_probs(clip, image_emb, text_emb) -> [b, n_labels]`**: zero-shot softmax. It takes embeddings
 rather than images, so real, lensed and ablated embeddings are scored the same way.
 
-### `mmsafety.dual_encoders`: CLIP and SigLIP side by side
+### `lever.dual_encoders`: CLIP and SigLIP side by side
 
 **`load_dual_encoder(model_id, device=None) -> DualEncoder`**: the family is read from the config
 (`clip` or `siglip`), not guessed from the name.
@@ -266,7 +266,7 @@ rather than images, so real, lensed and ablated embeddings are scored the same w
 over patch tokens at every layer, the representation comparable across families); and `cls`
 (CLIP only, else `None`).
 
-### `mmsafety.similarity`
+### `lever.similarity`
 
 **`linear_cka(x [n, d1], y [n, d2]) -> float`**: linear CKA
 ([Kornblith et al., 2019](https://arxiv.org/abs/1905.00414)), invariant to rotation and isotropic
@@ -274,7 +274,7 @@ scaling (tested). It's dominated by high-variance directions, so **check for out
 first**: CLIP-B/16 has one at layer 8 that flips the conclusion. Report CKA both raw and after
 per-dimension standardization.
 
-### `mmsafety.images`: attack stimuli
+### `lever.images`: attack stimuli
 
 **`stamp_text(image, text, frac) -> Image`**: renders `text` in a white-backed label below center,
 with font height `frac` × image height. It's programmatic so attacks are reproducible and easy to
@@ -318,7 +318,7 @@ Numbered, self-contained scripts that write to `outputs/` (git-ignored).
 | `experiments/clip/04_clip_vs_siglip_diff.py` | CLIP vs SigLIP (same ViT-B/16): behavior, geometry, layerwise CKA and probes, text-reading |
 | `experiments/vlm/01_image_token_logit_lens.py` | At which LM layers do image tokens decode to object words, and where? |
 
-Findings are logged in [`notes/ROADMAP.md`](https://github.com/vijpandaturtle/multimodal-ai-safety/blob/main/notes/ROADMAP.md).
+Findings are logged in [`notes/ROADMAP.md`](https://github.com/vijpandaturtle/lever-interp/blob/main/notes/ROADMAP.md).
 
 ## Roadmap
 

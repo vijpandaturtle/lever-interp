@@ -36,9 +36,9 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from torchvision.datasets import Imagenette
 
-from mmsafety.dual_encoders import load_dual_encoder
-from mmsafety.images import stamp_text
-from mmsafety.similarity import linear_cka
+from lever.dual_encoders import load_dual_encoder
+from lever.images import stamp_text
+from lever.similarity import linear_cka
 
 TEMPLATES = ["a photo of a {}.", "a blurry photo of a {}.", "a close-up photo of a {}.", "a photo of the {}.", "an image of a {}."]
 

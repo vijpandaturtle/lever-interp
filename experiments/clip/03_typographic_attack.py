@@ -16,8 +16,8 @@ from pathlib import Path
 import torch
 from PIL import Image
 
-from mmsafety import decompose_image_embedding, label_probs, load_clip
-from mmsafety.images import stamp_text
+from lever import decompose_image_embedding, label_probs, load_clip
+from lever.images import stamp_text
 
 
 def main():

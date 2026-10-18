@@ -1,6 +1,6 @@
-site_name: mmsafety
+site_name: lever
 site_description: Mechanistic interpretability tooling for vision-language models, built for safety research
-repo_url: https://github.com/vijpandaturtle/multimodal-ai-safety
+repo_url: https://github.com/vijpandaturtle/lever-interp
 edit_uri: edit/main/docs/
 
 theme:
