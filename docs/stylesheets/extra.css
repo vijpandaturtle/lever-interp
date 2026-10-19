@@ -1,0 +1,67 @@
+/* Colors and fonts copied from vijpandaturtle.github.io/style.css so the docs match the main site. */
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap");
+
+:root, [data-md-color-scheme="default"] {
+  --lever-bg: #f3f8ff;
+  --lever-text: #0f172a;
+  --lever-muted: #5b6577;
+  --lever-line: #d9e4f3;
+  --lever-accent: #2563eb;
+  --lever-accent-bright: #1d4ed8;
+  --lever-accent-soft: #e0ecff;
+
+  --md-primary-fg-color: var(--lever-bg);
+  --md-primary-fg-color--light: var(--lever-accent-soft);
+  --md-primary-fg-color--dark: var(--lever-accent-bright);
+  --md-primary-bg-color: var(--lever-text);
+  --md-primary-bg-color--light: var(--lever-muted);
+  --md-accent-fg-color: var(--lever-accent-bright);
+  --md-accent-fg-color--transparent: var(--lever-accent-soft);
+
+  --md-default-fg-color: var(--lever-text);
+  --md-default-fg-color--light: var(--lever-muted);
+  --md-default-bg-color: transparent;
+  --md-typeset-color: var(--lever-text);
+  --md-typeset-a-color: var(--lever-accent);
+  --md-code-bg-color: #ffffff;
+  --md-code-fg-color: var(--lever-text);
+}
+
+body {
+  background-color: var(--lever-bg);
+  background-image:
+    radial-gradient(ellipse 80% 55% at 85% 0%, rgba(125, 178, 255, .35), transparent 70%),
+    linear-gradient(180deg, #dceaff 0%, #eef5ff 35%, #ffffff 100%);
+  background-attachment: fixed;
+}
+
+/* Header: translucent bar with a hairline, like the site's sticky nav. */
+.md-header {
+  background: color-mix(in srgb, var(--lever-bg) 85%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--lever-line);
+  box-shadow: none;
+}
+.md-header__topic:first-child { font-family: "Space Grotesk", system-ui, sans-serif; font-weight: 600; }
+
+.md-typeset h1, .md-typeset h2 {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -.02em;
+  color: var(--lever-text);
+}
+.md-typeset h3 { font-weight: 600; }
+
+.md-typeset pre > code,
+.md-typeset table:not([class]) {
+  border: 1px solid var(--lever-line);
+  border-radius: 10px;
+}
+.md-typeset table:not([class]) th { background: var(--lever-accent-soft); }
+.md-typeset blockquote { border-left-color: var(--lever-accent); color: var(--lever-muted); }
+
+/* Footer: plain hairline + muted text, like the site's footer, instead of Material's dark bar. */
+.md-footer, .md-footer-meta { background: transparent; color: var(--lever-muted); }
+.md-footer-meta { border-top: 1px solid var(--lever-line); }
+.md-footer-meta.md-typeset a, .md-footer-meta.md-typeset a:focus { color: var(--lever-muted); }
+.md-footer-meta.md-typeset a:hover { color: var(--lever-accent-bright); }
