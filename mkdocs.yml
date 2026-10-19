@@ -9,13 +9,17 @@ theme:
     - content.code.copy
     - navigation.top
     - toc.follow
+  # Light-only, matching vijpandaturtle.github.io (which has no dark mode).
   palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      toggle: {icon: material/brightness-7, name: Switch to dark mode}
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      toggle: {icon: material/brightness-4, name: Switch to light mode}
+    scheme: default
+    primary: custom
+    accent: custom
+  font:
+    text: IBM Plex Sans
+    code: IBM Plex Mono
+
+extra_css:
+  - stylesheets/extra.css
 
 nav:
   - Home: index.md
