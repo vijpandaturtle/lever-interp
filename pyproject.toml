@@ -17,6 +17,7 @@ dependencies = [
     "scikit-learn",
     "sentencepiece",
     "protobuf",
+    "safetensors",
 ]
 
 [dependency-groups]
