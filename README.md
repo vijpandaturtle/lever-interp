@@ -22,6 +22,7 @@ src/lever/
   models.py      LLaVA + Qwen-VL behind one VLM interface (vit.{i}, projector, lm.{i}, final_norm)
   hooks.py       record activations / patch module outputs
   lens.py        logit lens for the LM side
+  counterfactual.py  flip rates under paired input edits (CLIP and VLMs)
 experiments/
   clip/          stage 1
   vlm/           stages 2-3 (same scripts, different --model)
